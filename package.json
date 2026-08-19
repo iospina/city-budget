@@ -1,0 +1,36 @@
+{
+  "name": "city-budget",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "City Budget — making NYC's Checkbook NYC spending and revenue legible to residents.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "lint": "tsc --noEmit",
+    "ingest": "tsx scripts/ingest-local.ts",
+    "check": "tsx scripts/check.ts",
+    "probe": "tsx scripts/probe.ts"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "^0.10.4",
+    "fast-xml-parser": "^4.5.0",
+    "posthog-js": "^1.165.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vercel/node": "^3.2.24",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  }
+}
