@@ -7,7 +7,8 @@ Service-category-first dashboard. Mobile-first. Built on the City Permits stack.
 dashboard. **Day 2** adds the Revenue view, the Category detail screen, the Share
 control with deep links, wired PostHog events, and the Checkbook ingestion
 pipeline (serverless + Neon-ready, activated when credentials are wired). The
-client still renders Day-1/2 mock data until a cron run populates Postgres.
+deployed app now serves real Checkbook figures from Postgres; the mock layer
+remains only as an offline fallback (see "Data source" below).
 
 ## Stack
 
@@ -84,10 +85,15 @@ Server-only code lives outside `src/` so it never enters the browser bundle:
 - `api/cron/ingest.ts` — the Vercel cron handler (daily, see `vercel.json`).
 - `api/spending.ts`, `api/revenue.ts`, `api/fiscal-years.ts` — read endpoints.
 
-**To go live:** set `DATABASE_URL` (Neon) and `CRON_SECRET` in Vercel env, deploy,
-trigger one cron run to populate the table, then point the three functions in
-`src/api/index.ts` at the `/api/*` endpoints (they already return the exact
-payload shapes the client consumes). No component changes needed.
+**Live status:** done. `DATABASE_URL` and `CRON_SECRET` are set in Vercel, the
+daily cron is running, and `/api/fiscal-years`, `/api/spending?year=YYYY` and
+`/api/revenue?year=YYYY` all return real aggregates (FY2021-FY2025).
+
+**Data source:** `src/api/index.ts` is live-first with a mock fallback. Each
+function calls the `/api/*` endpoint and only falls back to `src/data/mockData.ts`
+if the request fails or comes back empty - which is what happens in local dev
+without serverless running. No flag to flip: production serves real data because
+the endpoints answer, and local dev keeps rendering because they do not.
 
 ## Deep links (shareable views)
 
