@@ -8,8 +8,20 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Measure, ProductView, RevenueMeasure } from "../types";
-import { DEFAULT_FISCAL_YEAR, MOCK_FISCAL_YEARS } from "../data/mockData";
+import type { Measure, MeasureAvailability, ProductView, RevenueMeasure } from "../types";
+import { currentFiscalYear, isPlausibleFiscalYear } from "../lib/fiscalYears";
+
+/** Most recent fiscal year, derived from the clock rather than hardcoded. The
+ *  real list arrives from /api/fiscal-years; App clamps to it once it loads. */
+const DEFAULT_FISCAL_YEAR = currentFiscalYear();
+
+/** Years with no availability metadata are treated as fully available. */
+export const ALL_MEASURES_AVAILABLE: MeasureAvailability = {
+  adopted: true,
+  modified: true,
+  committed: true,
+  cash_spent: true,
+};
 
 /**
  * Global app state (Sections 12 & 13). Two global lenses — fiscal year and
@@ -32,8 +44,18 @@ import { DEFAULT_FISCAL_YEAR, MOCK_FISCAL_YEARS } from "../data/mockData";
 interface AppState {
   fiscalYear: number;
   view: ProductView;
-  /** Spending measure (four). */
+  /**
+   * The spending measure in effect. This is the user's chosen measure unless it
+   * has no data for the active year, in which case it falls back to Adopted.
+   *
+   * The choice itself is held separately and never overwritten, so moving to a
+   * year where the measure is unavailable and back again restores it rather than
+   * silently stranding the user on Adopted.
+   */
   measure: Measure;
+  /** Which measures have data for the active year. */
+  measureAvailability: MeasureAvailability;
+  setMeasureAvailability: (availability: MeasureAvailability) => void;
   /** Revenue measure (three). */
   revenueMeasure: RevenueMeasure;
   selectedCategoryId: string | null;
@@ -46,8 +68,6 @@ interface AppState {
 }
 
 const AppStateContext = createContext<AppState | null>(null);
-
-const VALID_YEARS = new Set<number>(MOCK_FISCAL_YEARS);
 
 interface RouteState {
   view: ProductView;
@@ -63,7 +83,10 @@ function parseLocation(): RouteState {
   const params = new URLSearchParams(search);
 
   const yearParam = Number(params.get("fy"));
-  const fiscalYear = VALID_YEARS.has(yearParam) ? yearParam : DEFAULT_FISCAL_YEAR;
+  // Validated against a plausible range, not a fixed list: the real list of
+  // seeded years is not known synchronously at parse time, and a hardcoded list
+  // silently redirects deep links to years added later.
+  const fiscalYear = isPlausibleFiscalYear(yearParam) ? yearParam : DEFAULT_FISCAL_YEAR;
 
   const categoryMatch = pathname.match(/^\/category\/([a-z-]+)\/?$/);
   const selectedCategoryId = categoryMatch ? categoryMatch[1] : null;
@@ -92,7 +115,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const initial = parseLocation();
   const [fiscalYear, setFiscalYearState] = useState<number>(initial.fiscalYear);
   const [view, setViewState] = useState<ProductView>(initial.view);
-  const [measure, setMeasureState] = useState<Measure>("adopted");
+  const [preferredMeasure, setPreferredMeasure] = useState<Measure>("adopted");
+  const [measureAvailability, setAvailabilityState] =
+    useState<MeasureAvailability>(ALL_MEASURES_AVAILABLE);
+  // Derived, never stored: keeps the user's choice intact across years.
+  const measure: Measure = measureAvailability[preferredMeasure] ? preferredMeasure : "adopted";
   const [revenueMeasure, setRevenueMeasureState] = useState<RevenueMeasure>("adopted");
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(
     initial.selectedCategoryId
@@ -137,7 +164,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setFiscalYear = useCallback((year: number) => setFiscalYearState(year), []);
-  const setMeasure = useCallback((m: Measure) => setMeasureState(m), []);
+  const setMeasure = useCallback((m: Measure) => setPreferredMeasure(m), []);
+  const setMeasureAvailability = useCallback((next: MeasureAvailability) => {
+    // Value-compare so re-fetching the same year does not re-render the tree.
+    setAvailabilityState((prev) =>
+      prev.adopted === next.adopted &&
+      prev.modified === next.modified &&
+      prev.committed === next.committed &&
+      prev.cash_spent === next.cash_spent
+        ? prev
+        : next
+    );
+  }, []);
   const setRevenueMeasure = useCallback((m: RevenueMeasure) => setRevenueMeasureState(m), []);
   const setView = useCallback((v: ProductView) => {
     setViewState(v);
@@ -151,6 +189,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       fiscalYear,
       view,
       measure,
+      measureAvailability,
+      setMeasureAvailability,
       revenueMeasure,
       selectedCategoryId,
       setFiscalYear,
@@ -164,6 +204,8 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       fiscalYear,
       view,
       measure,
+      measureAvailability,
+      setMeasureAvailability,
       revenueMeasure,
       selectedCategoryId,
       setFiscalYear,

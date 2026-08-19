@@ -10,6 +10,15 @@
 /** The four budget measures. A global "lens" alongside fiscal year (Section 13). */
 export type Measure = "adopted" | "modified" | "committed" | "cash_spent";
 
+/**
+ * Which measures have real data for a given fiscal year. Execution measures
+ * (Committed, Cash Spent) are near zero early in a live fiscal year, so they are
+ * shown disabled rather than displayed as if they were real figures.
+ * Optional: payloads aggregated before this field existed omit it, and the
+ * client treats a missing value as "all four available".
+ */
+export type MeasureAvailability = Record<Measure, boolean>;
+
 /** Revenue has only three measures (build-fix acceptance criterion #4). */
 export type RevenueMeasure = "adopted" | "modified" | "recognized";
 
@@ -92,6 +101,8 @@ export interface SpendingPayload {
   obligationsTotal: MeasureAmounts;
   categories: ServiceCategory[];
   obligations: ObligationLine[];
+  /** Per-measure availability for this year. Absent on pre-existing payloads. */
+  measureAvailability?: MeasureAvailability;
   lastUpdated: string; // ISO timestamp
 }
 

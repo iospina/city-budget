@@ -1,4 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
+import { DISPLAY_YEAR_LIMIT } from "../src/lib/fiscalYears";
 
 /**
  * GET /api/fiscal-years — the fiscal years that have pre-aggregated data,
@@ -11,8 +12,11 @@ export default async function handler(_req: VercelRequest, res: VercelResponse) 
 
     const { neon } = await import("@neondatabase/serverless");
     const sql = neon(url);
+    // Section 12: offer the five most recent years. Older years stay in the
+    // table because year-over-year for the oldest displayed year is computed at
+    // ingest time against its predecessor.
     const rows = (await sql(
-      `SELECT DISTINCT fiscal_year FROM aggregates ORDER BY fiscal_year DESC`
+      `SELECT DISTINCT fiscal_year FROM aggregates ORDER BY fiscal_year DESC LIMIT ${DISPLAY_YEAR_LIMIT}`
     )) as { fiscal_year: number }[];
 
     res.setHeader("Cache-Control", "s-maxage=3600, stale-while-revalidate=86400");

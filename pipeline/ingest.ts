@@ -97,6 +97,7 @@ export async function ingestSpendingYear(
     obligationsTotal: agg.obligationsTotal,
     categories: agg.categories,
     obligations: agg.obligations,
+    measureAvailability: agg.measureAvailability,
     lastUpdated: new Date().toISOString(),
   });
 

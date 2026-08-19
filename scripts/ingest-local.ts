@@ -21,7 +21,7 @@ import {
   ingestSpendingYear,
   prevTotalsFromCategories,
 } from "../pipeline/ingest";
-import { MOCK_FISCAL_YEARS } from "../src/data/mockData";
+import { ingestYears } from "../src/lib/fiscalYears";
 import type { ServiceCategoryId } from "../src/types";
 
 type CatAdopted = { id: ServiceCategoryId; adopted: number };
@@ -67,7 +67,7 @@ async function main() {
   // years already fully seeded (unless --force).
   const years = yearArg
     ? [Number(yearArg)]
-    : [...MOCK_FISCAL_YEARS].sort((a, b) => a - b); // oldest -> newest for YoY chaining
+    : ingestYears(); // oldest -> newest, derived from the clock (Section 12)
   const allowSkip = !yearArg && !force;
 
   console.log(`Seeding Neon for fiscal year(s): ${years.join(", ")}`);

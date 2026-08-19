@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { AppStateProvider, useAppState } from "./state/AppState";
+import { ALL_MEASURES_AVAILABLE, AppStateProvider, useAppState } from "./state/AppState";
 import { TopChrome } from "./components/TopChrome";
 import { SpendingView } from "./components/SpendingView";
 import { RevenueView } from "./components/RevenueView";
@@ -8,7 +8,7 @@ import { SkeletonLoader } from "./components/SkeletonLoader";
 import { useSpendingData } from "./hooks/useSpendingData";
 import { useRevenueData } from "./hooks/useRevenueData";
 import { getFiscalYears } from "./api";
-import { MOCK_FISCAL_YEARS } from "./data/mockData";
+import { displayYears } from "./lib/fiscalYears";
 import { initSession, track } from "./analytics/events";
 
 /**
@@ -23,16 +23,35 @@ import { initSession, track } from "./analytics/events";
  *   otherwise               -> SpendingView
  */
 function AppShell() {
-  const { fiscalYear, view, selectedCategoryId } = useAppState();
-  const [years, setYears] = useState<number[]>(
-    [...MOCK_FISCAL_YEARS].sort((a, b) => b - a)
-  );
+  const { fiscalYear, view, selectedCategoryId, setFiscalYear, setMeasureAvailability } =
+    useAppState();
+  // Seeded from the clock so the selector renders immediately, then replaced by
+  // the years actually seeded in Postgres.
+  const [years, setYears] = useState<number[]>(() => displayYears());
   const spending = useSpendingData(fiscalYear);
   const revenue = useRevenueData(fiscalYear);
 
   useEffect(() => {
-    getFiscalYears().then(setYears);
+    getFiscalYears().then((available) => {
+      setYears(available);
+      // The clock says a fiscal year has begun; Postgres decides whether it has
+      // been ingested yet. If not, fall back to the most recent seeded year so
+      // the app never opens on a year with no data behind it.
+      if (available.length > 0 && !available.includes(fiscalYear)) {
+        setFiscalYear(available[0]);
+      }
+    });
+    // Runs once: the year list does not change within a session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Publish this year's measure availability so the MeasureLens can disable the
+  // measures that have no data yet (Task 2 / Section 13).
+  useEffect(() => {
+    if (spending.payload) {
+      setMeasureAvailability(spending.payload.measureAvailability ?? ALL_MEASURES_AVAILABLE);
+    }
+  }, [spending.payload, setMeasureAvailability]);
 
   // Initialize the analytics session once, with the entry view (Section 22).
   const sessionInit = useRef(false);

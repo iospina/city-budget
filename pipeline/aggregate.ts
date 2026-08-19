@@ -1,3 +1,5 @@
+import type { MeasureAvailability } from "../src/types";
+import { computeMeasureAvailability } from "../src/lib/measureAvailability";
 import type { BudgetRecord, RevenueRecord } from "./parse";
 import {
   AGENCY_BY_CODE,
@@ -71,7 +73,11 @@ export interface SpendingAggregate {
   obligations: ObligationLine[];
   servicesTotal: MeasureAmounts;
   obligationsTotal: MeasureAmounts;
+  measureAvailability: MeasureAvailability;
 }
+
+// Availability rule lives in src/lib/measureAvailability so the client can
+// apply the same test to years aggregated before the field existed.
 
 class Accumulator {
   // category id -> totals + spending-type subtotals
@@ -211,7 +217,21 @@ export function finalizeSpending(
 
   const servicesTotal = sumMeasures(categories.map((c) => ({ ...c })));
   const obligationsTotal = sumMeasures(obligations.map((o) => ({ ...o })));
-  return { categories, obligations, servicesTotal, obligationsTotal };
+  // Availability is judged on the citywide grand total, not on services alone,
+  // so a year is assessed on the same figure the hero headline shows.
+  const grandTotal: MeasureAmounts = {
+    adopted: servicesTotal.adopted + obligationsTotal.adopted,
+    modified: servicesTotal.modified + obligationsTotal.modified,
+    committed: servicesTotal.committed + obligationsTotal.committed,
+    cash_spent: servicesTotal.cash_spent + obligationsTotal.cash_spent,
+  };
+  return {
+    categories,
+    obligations,
+    servicesTotal,
+    obligationsTotal,
+    measureAvailability: computeMeasureAvailability(grandTotal),
+  };
 }
 
 export function createAccumulator(): Accumulator {

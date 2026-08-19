@@ -5,7 +5,7 @@ import {
   ingestSpendingYear,
   prevTotalsFromCategories,
 } from "../../pipeline/ingest";
-import { MOCK_FISCAL_YEARS } from "../../src/data/mockData";
+import { ingestYears } from "../../src/lib/fiscalYears";
 import type { ServiceCategoryId } from "../../src/types";
 
 /**
@@ -33,7 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
   }
 
-  const years = [...MOCK_FISCAL_YEARS].sort((a, b) => a - b); // oldest -> newest for YoY chaining
+  const years = ingestYears(); // oldest -> newest, derived from the clock (Section 12)
   try {
     await ensureSchema();
 

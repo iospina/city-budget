@@ -1,3 +1,4 @@
+import { currentFiscalYear, displayYears } from "../lib/fiscalYears";
 import type {
   FiscalYear,
   ObligationLine,
@@ -23,8 +24,10 @@ import {
  * each fiscal year differs (so the year selector visibly changes data).
  */
 
-export const MOCK_FISCAL_YEARS = [2021, 2022, 2023, 2024, 2025] as const;
-export const DEFAULT_FISCAL_YEAR = 2025; // most recent (Section 12)
+/** Mock years track the real range so local dev without serverless shows the
+ *  same fiscal years the deployed app offers (most recent first). */
+export const MOCK_FISCAL_YEARS: number[] = displayYears();
+export const DEFAULT_FISCAL_YEAR = MOCK_FISCAL_YEARS[0]; // most recent (Section 12)
 
 /** Base FY2025 adopted amounts per category (dollars). Distinct per category. */
 const BASE_CATEGORY_ADOPTED: Record<ServiceCategoryId, number> = {
@@ -106,6 +109,8 @@ const YEAR_SCALE: Record<number, number> = {
   2023: 0.945,
   2024: 0.975,
   2025: 1.0,
+  2026: 1.03,
+  2027: 1.12,
 };
 
 /** Deterministic pseudo-random in [-1, 1] from a string seed (stable across renders). */
@@ -119,11 +124,26 @@ function seededUnit(seed: string): number {
   return ((h >>> 0) / 0xffffffff) * 2 - 1;
 }
 
-/** Derive the four measures from an adopted base with small, stable variation. */
-function deriveMeasures(adopted: number, seed: string) {
+/**
+ * Derive the four measures from an adopted base with small, stable variation.
+ *
+ * A fiscal year still in progress is modelled differently: Adopted and Modified
+ * are set at the start of the year and are therefore complete, but Committed and
+ * Cash Spent only reflect the months elapsed so far. Without this, mock data
+ * makes every year look closed, and local development never exercises the
+ * disabled MeasureLens pills that a live year produces.
+ *
+ * The in-progress ratios approximate the real citywide shape measured for FY2027
+ * in August 2026: Committed near a third of Adopted, Cash Spent near a tenth.
+ */
+function deriveMeasures(adopted: number, seed: string, year: number) {
   const modified = adopted * (1.02 + 0.03 * seededUnit(seed + "mod"));
-  const committed = modified * (0.99 + 0.015 * seededUnit(seed + "com"));
-  const cash_spent = committed * (0.93 + 0.04 * seededUnit(seed + "cash"));
+  let committed = modified * (0.99 + 0.015 * seededUnit(seed + "com"));
+  let cash_spent = committed * (0.93 + 0.04 * seededUnit(seed + "cash"));
+  if (year >= currentFiscalYear()) {
+    committed = adopted * (0.32 + 0.03 * seededUnit(seed + "prog"));
+    cash_spent = adopted * (0.11 + 0.02 * seededUnit(seed + "cashprog"));
+  }
   return {
     adopted: Math.round(adopted),
     modified: Math.round(modified),
@@ -153,7 +173,7 @@ export function buildSpendingPayload(year: number): SpendingPayload {
     const baseAdopted = BASE_CATEGORY_ADOPTED[token.id];
     const seed = `${token.id}-${year}`;
     const adoptedThis = baseAdopted * scale * (1 + 0.02 * seededUnit(seed + "yr"));
-    const measures = deriveMeasures(adoptedThis, seed);
+    const measures = deriveMeasures(adoptedThis, seed, year);
     // YoY adopted-to-adopted basis (Section 26).
     const adoptedPrev = baseAdopted * prevScale * (1 + 0.02 * seededUnit(`${token.id}-${year - 1}yr`));
     const yoyPercent = ((measures.adopted - adoptedPrev) / adoptedPrev) * 100;
@@ -172,7 +192,7 @@ export function buildSpendingPayload(year: number): SpendingPayload {
   const obligations: ObligationLine[] = BASE_OBLIGATIONS.map((o) => {
     const seed = `${o.id}-${year}`;
     const adoptedThis = o.adopted * scale * (1 + 0.015 * seededUnit(seed + "yr"));
-    const measures = deriveMeasures(adoptedThis, seed);
+    const measures = deriveMeasures(adoptedThis, seed, year);
     return { id: o.id, name: o.name, ...measures, shareOfObligations: 0 };
   });
 
@@ -207,6 +227,15 @@ export function buildSpendingPayload(year: number): SpendingPayload {
     obligationsTotal,
     categories,
     obligations,
+    // Mirrors the pipeline rule (pipeline/aggregate.ts) so local dev without
+    // serverless exercises the same disabled-pill path as production: the live
+    // fiscal year has no meaningful execution data yet.
+    measureAvailability: {
+      adopted: true,
+      modified: true,
+      committed: year < currentFiscalYear(),
+      cash_spent: year < currentFiscalYear(),
+    },
     lastUpdated: "2026-06-22T08:00:00.000Z",
   };
 }

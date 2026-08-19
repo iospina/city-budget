@@ -74,6 +74,9 @@ export function HeroCard({ payload, measure, onMeasureChange }: HeroCardProps) {
                 id: m.id,
                 label: m.label,
                 amount: grandTotalFor(payload, m.id),
+                // Payloads aggregated before per-measure availability existed
+                // omit the field; treat those years as fully available.
+                available: payload.measureAvailability?.[m.id] ?? true,
               }))}
             />
           </div>
