@@ -151,3 +151,17 @@ detail's "All Services" control.
 23). It ships in both City Budget and City Permits; build once, import into
 both. Active product is driven by the `product` prop. Day 1 renders it with
 `product="city-budget"` hardcoded.
+
+## Where this lives (August 2026)
+
+Source of truth: `~/Code/CityBudget`. Moved out of iCloud Drive, which was
+syncing `node_modules` and build output and corrupting builds.
+
+Repo: https://github.com/iospina/city-budget (public, `main`).
+
+Vercel: team `iospina`, project `citybudget`, live at https://citybudget.vercel.app.
+Pushes to `main` deploy automatically, so Option B above is the live setup and the
+Vercel CLI path is now only a fallback.
+
+Sibling app: City Permits at `~/Code/CityPermits`, repo `iospina/city-permits`,
+live at https://citypermits.vercel.app.
