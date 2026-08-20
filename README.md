@@ -82,12 +82,22 @@ Server-only code lives outside `src/` so it never enters the browser bundle:
 - `pipeline/ingest.ts` — the per-year fetch → parse → aggregate → write run
   (3-char zero-padded agency codes; Budget `year` vs Revenue `fiscal_year`).
 - `pipeline/db.ts` — Neon Postgres schema + read/write of the aggregated JSON.
-- `api/cron/ingest.ts` — the Vercel cron handler (daily, see `vercel.json`).
+- `api/cron/ingest.ts` — retired stub returning 410. The schedule moved to
+  `.github/workflows/ingest.yml` (see below).
 - `api/spending.ts`, `api/revenue.ts`, `api/fiscal-years.ts` — read endpoints.
 
-**Live status:** done. `DATABASE_URL` and `CRON_SECRET` are set in Vercel, the
-daily cron is running, and `/api/fiscal-years`, `/api/spending?year=YYYY` and
-`/api/revenue?year=YYYY` all return real aggregates (FY2021-FY2025).
+**Live status:** `DATABASE_URL` is set in Vercel and the read endpoints
+`/api/fiscal-years`, `/api/spending?year=YYYY` and `/api/revenue?year=YYYY` all
+return real aggregates. FY2021 through FY2027 are seeded; the selector offers
+the five most recent.
+
+**Scheduled ingestion runs in GitHub Actions**, not as a Vercel cron. See
+`.github/workflows/ingest.yml`. The earlier `api/cron/ingest.ts` could never
+have worked: it imported across directories, which Vercel does not bundle, so
+every run died at module resolution in about 150ms, and even bundled it would
+have needed roughly 30 minutes against a function ceiling of 800 seconds. Until
+this moved, the data was only ever current because someone ran the seed script
+by hand.
 
 **Data source:** `src/api/index.ts` is live-first with a mock fallback. Each
 function calls the `/api/*` endpoint and only falls back to `src/data/mockData.ts`

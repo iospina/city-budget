@@ -1,61 +1,32 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { ensureSchema } from "../../pipeline/db";
-import {
-  ingestRevenueYear,
-  ingestSpendingYear,
-  prevTotalsFromCategories,
-} from "../../pipeline/ingest";
-import { ingestYears } from "../../src/lib/fiscalYears";
-import type { ServiceCategoryId } from "../../src/types";
 
 /**
- * Vercel cron handler (Section 7 #5). Runs daily, pulls the in-scope fiscal
- * years from Checkbook, pre-aggregates, and writes to Postgres. Mirrors the
- * City Permits DOB-NOW pull pattern.
+ * Retired. Scheduled ingestion moved to GitHub Actions.
  *
- * Mechanics handled downstream: ≈3s throttle between Checkbook calls (Incapsula),
- * pagination past the 20k cap, 3-char zero-padded agency codes, Budget `year` vs
- * Revenue `fiscal_year`.
+ * This endpoint previously held the ingestion run itself, and could never have
+ * worked. Two reasons, either of them fatal:
  *
- * Schedule is configured in vercel.json. Protect manual invocation with
- * CRON_SECRET (Vercel sets the Authorization: Bearer header on scheduled runs).
+ *   1. It imported ../../pipeline/* and ../../src/*. Vercel ships only what
+ *      lives under api/, so every scheduled run died at module resolution with
+ *      ERR_MODULE_NOT_FOUND in about 150ms, long before the handler ran. Every
+ *      other function in this project, and every function in City Permits, is
+ *      self-contained. This one was the exception.
+ *   2. Even bundled correctly it could not finish. The pull is roughly 87
+ *      agencies per fiscal year, throttled about 3 seconds apart to clear
+ *      Checkbook's Incapsula bot protection. That is around 30 minutes against
+ *      a function ceiling of 300s by default and 800s at most.
  *
- * NOTE: not active until DATABASE_URL is wired in Vercel env. Until then the
- * client serves mock data from src/api. Flip the client read layer to the HTTP
- * endpoints below once a run has populated the table.
+ * The schedule now lives in .github/workflows/ingest.yml, which runs
+ * scripts/ingest-local.ts on the same daily cadence with a 90 minute budget.
+ *
+ * Kept as a stub rather than deleted so that anything still pointing here gets
+ * an explanation instead of an opaque 500. Self-contained by design: no imports
+ * beyond the Vercel types, which is the rule this file used to break.
  */
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const secret = process.env.CRON_SECRET;
-  if (secret) {
-    const auth = req.headers["authorization"];
-    if (auth !== `Bearer ${secret}`) {
-      return res.status(401).json({ error: "unauthorized" });
-    }
-  }
-
-  const years = ingestYears(); // oldest -> newest, derived from the clock (Section 12)
-  try {
-    await ensureSchema();
-
-    let prevCategories: { id: ServiceCategoryId; adopted: number }[] | null = null;
-    const done: number[] = [];
-
-    for (const year of years) {
-      await ingestRevenueYear(year);
-      // ingestSpendingYear returns this year's category adopted totals, chained
-      // forward as the next year's adopted-to-adopted YoY basis.
-      prevCategories = await ingestSpendingYear(
-        year,
-        prevCategories ? prevTotalsFromCategories(prevCategories) : undefined
-      );
-      done.push(year);
-    }
-
-    return res.status(200).json({ ok: true, ingested: done });
-  } catch (err) {
-    return res.status(500).json({
-      ok: false,
-      error: err instanceof Error ? err.message : "ingestion failed",
-    });
-  }
+export default function handler(_req: VercelRequest, res: VercelResponse) {
+  return res.status(410).json({
+    error: "gone",
+    message:
+      "Scheduled ingestion moved to GitHub Actions. See .github/workflows/ingest.yml.",
+  });
 }

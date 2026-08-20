@@ -8,8 +8,13 @@
  *
  * Usage:
  *   1. Put your Neon connection string in .env as DATABASE_URL=...
- *   2. npm run ingest            (all years)
- *      npm run ingest -- 2025    (a single year, e.g. for a quick test)
+ *   2. npm run ingest              (all years, skipping any already seeded)
+ *      npm run ingest -- --refresh (only the years that can still change)
+ *      npm run ingest -- 2025      (a single year, e.g. for a quick test)
+ *      npm run ingest -- --force   (rebuild every year from scratch)
+ *
+ * The scheduled refresh runs in GitHub Actions (.github/workflows/ingest.yml),
+ * not as a Vercel cron: the throttled pull far exceeds any function timeout.
  *
  * This takes several minutes for all five years (the throttle is deliberate).
  * Re-running is safe — it upserts.
@@ -21,7 +26,7 @@ import {
   ingestSpendingYear,
   prevTotalsFromCategories,
 } from "../pipeline/ingest";
-import { ingestYears } from "../src/lib/fiscalYears";
+import { ingestYears, refreshYears } from "../src/lib/fiscalYears";
 import type { ServiceCategoryId } from "../src/types";
 
 type CatAdopted = { id: ServiceCategoryId; adopted: number };
@@ -61,14 +66,22 @@ async function main() {
 
   const args = process.argv.slice(2);
   const force = args.includes("--force");
+  // --refresh: re-pull only the years that can still change. This is what the
+  // scheduled GitHub Actions run uses; a plain run skips already-seeded years
+  // and would therefore refresh nothing.
+  const refresh = args.includes("--refresh");
   const revenueOnly = args.includes("--revenue-only");
   const yearArg = args.find((a) => /^\d{4}$/.test(a));
   // A specific year is always (re)ingested; the all-years run resumes by skipping
   // years already fully seeded (unless --force).
   const years = yearArg
     ? [Number(yearArg)]
-    : ingestYears(); // oldest -> newest, derived from the clock (Section 12)
-  const allowSkip = !yearArg && !force;
+    : refresh
+      ? refreshYears() // the live year and the one just closed
+      : ingestYears(); // oldest -> newest, derived from the clock (Section 12)
+  // A named year and a refresh are always re-ingested; only a plain full run
+  // resumes by skipping years already seeded.
+  const allowSkip = !yearArg && !refresh && !force;
 
   console.log(`Seeding Neon for fiscal year(s): ${years.join(", ")}`);
   console.log("This is throttled ~3s per Checkbook call and may take several minutes...");

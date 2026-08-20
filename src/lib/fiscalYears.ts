@@ -36,6 +36,19 @@ export function ingestYears(now: Date = new Date()): number[] {
   return years;
 }
 
+/**
+ * The fiscal years that can still change, oldest first.
+ *
+ * The year in progress changes daily. The year just closed can still take late
+ * adjustments. Everything older is static, so re-pulling it on a schedule burns
+ * throttle budget against Checkbook for no benefit. A full history rebuild is
+ * still available with `npm run ingest -- --force`.
+ */
+export function refreshYears(now: Date = new Date()): number[] {
+  const current = currentFiscalYear(now);
+  return [current - 1, current].filter((y) => y >= FIRST_FISCAL_YEAR);
+}
+
 /** The years offered in the selector, most recent first, capped per Section 12. */
 export function displayYears(now: Date = new Date()): number[] {
   return ingestYears(now).slice(-DISPLAY_YEAR_LIMIT).reverse();
