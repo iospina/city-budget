@@ -91,17 +91,23 @@ function capture(event: AnalyticsEvent, props: Props = {}): void {
 /**
  * Engaged actions following a category detail view: changed fiscal year,
  * changed measure, viewed a second category, or shared. The FIRST such action
- * after a category_detail_viewed records the raw "time in breakdown before
- * acting" interval (once).
+ * after a category_detail_viewed carries the raw "time in breakdown before
+ * acting" interval as a PROPERTY on that action's own event.
+ *
+ * Deliberately NOT a separate capture. It used to emit its own
+ * `category_detail_viewed`, which added one phantom detail view for every
+ * engaged action that followed one, so detail-view volume read higher than the
+ * number of details actually viewed. The interval is a property of the engaged
+ * event, not an event in its own right.
  */
-function maybeCaptureBreakdownInterval(): void {
+function breakdownIntervalProps(): Props {
   if (lastCategoryDetailAt !== null && !breakdownActionCaptured) {
     breakdownActionCaptured = true;
-    capture("category_detail_viewed", {
-      _interval_name: "time_in_breakdown_before_acting_ms",
+    return {
       time_in_breakdown_before_acting_ms: Date.now() - lastCategoryDetailAt,
-    });
+    };
   }
+  return {};
 }
 
 // ---- Named event helpers ----------------------------------------------------
@@ -110,24 +116,23 @@ export const track = {
   dashboardLoaded: (fiscalYear: number) =>
     capture("dashboard_loaded", { fiscal_year: fiscalYear }),
 
-  viewToggledSpending: () => {
-    maybeCaptureBreakdownInterval();
-    capture("view_toggled_spending");
-  },
-  viewToggledRevenue: () => {
-    maybeCaptureBreakdownInterval();
-    capture("view_toggled_revenue");
-  },
+  viewToggledSpending: () =>
+    capture("view_toggled_spending", breakdownIntervalProps()),
+  viewToggledRevenue: () =>
+    capture("view_toggled_revenue", breakdownIntervalProps()),
 
-  fiscalYearChanged: (fiscalYear: number) => {
-    maybeCaptureBreakdownInterval();
-    capture("fiscal_year_changed", { fiscal_year: fiscalYear });
-  },
+  fiscalYearChanged: (fiscalYear: number) =>
+    capture("fiscal_year_changed", {
+      fiscal_year: fiscalYear,
+      ...breakdownIntervalProps(),
+    }),
 
-  measureChanged: (measure: string, view: string) => {
-    maybeCaptureBreakdownInterval();
-    capture("measure_changed", { measure, view });
-  },
+  measureChanged: (measure: string, view: string) =>
+    capture("measure_changed", {
+      measure,
+      view,
+      ...breakdownIntervalProps(),
+    }),
 
   categoryRowSelected: (categoryName: string) =>
     capture("category_row_selected", { category: categoryName }),
@@ -141,9 +146,12 @@ export const track = {
         time_to_first_category_detail_ms: Date.now() - sessionStart,
       });
     } else {
-      // A second/subsequent category view is itself an engaged action.
-      maybeCaptureBreakdownInterval();
-      capture("category_detail_viewed", { category: categoryName });
+      // A second/subsequent category view is itself an engaged action, so it
+      // carries interval (2) on its own event rather than emitting an extra one.
+      capture("category_detail_viewed", {
+        category: categoryName,
+        ...breakdownIntervalProps(),
+      });
     }
     // Arm interval (2) from this view.
     lastCategoryDetailAt = Date.now();
@@ -151,7 +159,10 @@ export const track = {
   },
 
   spendingTypeViewed: (categoryName: string, typeCount: number) =>
-    capture("spending_type_viewed", { category: categoryName, type_count: typeCount }),
+    capture("spending_type_viewed", {
+      category: categoryName,
+      type_count: typeCount,
+    }),
 
   revenueViewLoaded: (fiscalYear: number) =>
     capture("revenue_view_loaded", { fiscal_year: fiscalYear }),
@@ -159,14 +170,13 @@ export const track = {
   stackedBarSliceTapped: (categoryName: string) =>
     capture("stacked_bar_slice_tapped", { category: categoryName }),
 
-  shareInitiated: (shareKind: string, fiscalYear: number, categoryName?: string) => {
-    maybeCaptureBreakdownInterval();
+  shareInitiated: (shareKind: string, fiscalYear: number, categoryName?: string) =>
     capture("share_initiated", {
       share_kind: shareKind,
       fiscal_year: fiscalYear,
       category: categoryName,
-    });
-  },
+      ...breakdownIntervalProps(),
+    }),
 
   cityExplorerOpened: () => capture("city_explorer_opened"),
   cityExplorerProductSelected: (product: string) =>
