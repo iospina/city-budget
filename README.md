@@ -181,3 +181,4 @@ Vercel CLI path is now only a fallback.
 
 Sibling app: City Permits at `~/Code/CityPermits`, repo `iospina/city-permits`,
 live at https://citypermits.vercel.app.
+
