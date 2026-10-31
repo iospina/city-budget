@@ -1,4 +1,5 @@
 import posthog from "posthog-js";
+import { isInternalDevice } from "./internalOptOut";
 
 /**
  * PostHog analytics client.
@@ -26,6 +27,13 @@ export function initAnalytics(): void {
       // eslint-disable-next-line no-console
       console.info("[analytics] VITE_POSTHOG_KEY not set — PostHog disabled.");
     }
+    return;
+  }
+
+  // Ignacio's own devices (?internal=1) never load PostHog, so nothing is sent.
+  if (isInternalDevice()) {
+    // eslint-disable-next-line no-console
+    console.info("[analytics] Internal device — analytics disabled.");
     return;
   }
 
