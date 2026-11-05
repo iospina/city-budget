@@ -9,6 +9,7 @@ import { YoYBadge } from "./YoYBadge";
 import { SpendingTypeRow } from "./SpendingTypeRow";
 import { SourceFootnote } from "./SourceFootnote";
 import { DashboardActions } from "./DashboardActions";
+import { ResearchInvite } from "./ResearchInvite";
 import { SPENDING_MEASURES } from "../lib/tokens";
 import {
   amountFor,
@@ -148,6 +149,8 @@ export function CategoryDetail({ payload, categoryId, years }: CategoryDetailPro
           <div className="mt-3">
             <PartToWholeBar percent={share} color={category.color} />
           </div>
+
+          <ResearchInvite categoryName={category.name} />
         </div>
       </section>
 
