@@ -11,7 +11,7 @@ const PRIVACY_URL = "https://ignacioospina.com/privacy";
 export function Attribution({ className = "" }: { className?: string }) {
   return (
     <div
-      className={`inline-flex items-center gap-[5px] rounded bg-white/80 px-2 py-[3px] text-[11px] text-[#404040] shadow-sm backdrop-blur ${className}`}
+      className={`inline-flex items-center gap-[5px] whitespace-nowrap rounded bg-white/80 px-2 py-[3px] text-[11px] text-[#404040] shadow-sm backdrop-blur ${className}`}
     >
       <span>Built by</span>
       <a
