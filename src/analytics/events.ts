@@ -28,6 +28,9 @@ export type AnalyticsEvent =
   | "revenue_view_loaded"
   | "stacked_bar_slice_tapped"
   | "share_initiated"
+  | "research_invite_shown"
+  | "research_invite_clicked"
+  | "research_invite_dismissed"
   | "city_explorer_opened"
   | "city_explorer_product_selected";
 
@@ -177,6 +180,14 @@ export const track = {
       category: categoryName,
       ...breakdownIntervalProps(),
     }),
+
+  // Research invite inside a category detail (Tally form aOedKv).
+  researchInviteShown: (categoryName: string) =>
+    capture("research_invite_shown", { category: categoryName }),
+  researchInviteClicked: (categoryName: string) =>
+    capture("research_invite_clicked", { category: categoryName }),
+  researchInviteDismissed: (categoryName: string) =>
+    capture("research_invite_dismissed", { category: categoryName }),
 
   cityExplorerOpened: () => capture("city_explorer_opened"),
   cityExplorerProductSelected: (product: string) =>
